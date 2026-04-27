@@ -76,4 +76,19 @@ async function downloadSignedPdf(viewerUrl) {
   }
 }
 
-module.exports = { downloadSignedPdf };
+async function updateContactField(contactId, fieldKey, value) {
+  await axios.put(
+    `https://services.leadconnectorhq.com/contacts/${contactId}`,
+    { customFields: [{ key: fieldKey, field_value: value }] },
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.GHL_API_KEY}`,
+        Version: '2021-07-28',
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+  console.log(`[GHL] Updated contact ${contactId} field "${fieldKey}" = ${value}`);
+}
+
+module.exports = { downloadSignedPdf, updateContactField };

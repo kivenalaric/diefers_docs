@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 const express = require('express');
-const { downloadSignedPdf } = require('./ghl');
+const { downloadSignedPdf, updateContactField } = require('./ghl');
 const { getOrCreateClientFolder, uploadPdf, shareWithEmail } = require('./drive');
 
 const app = express();
@@ -9,7 +9,7 @@ const PORT = process.env.PORT || 3000;
 
 app.get('/webhook', async (req, res) => {
   const { name, email, link } = req.query;
-  // "doc name" is the document name from {{document.name}}
+  const contactId = req.query['id'];
   const docName = req.query['doc name'] || req.query['doc_name'] || req.query['contract'] || '';
 
   console.log(`\n[Webhook] Received — name: "${name}", email: "${email}", doc: "${docName}"`);
@@ -28,12 +28,12 @@ app.get('/webhook', async (req, res) => {
     return;
   }
 
-  processDocument({ name, email, docName, link }).catch((err) => {
+  processDocument({ name, email, docName, link, contactId }).catch((err) => {
     console.error('[Webhook] Unhandled error in processDocument:', err.message || err);
   });
 });
 
-async function processDocument({ name, email, docName, link }) {
+async function processDocument({ name, email, docName, link, contactId }) {
   // 1. Extract PDF from the InfoSubmit viewer via headless browser
   const pdfBuffer = await downloadSignedPdf(link);
   console.log(`[GHL] PDF captured — ${pdfBuffer.length} bytes`);
@@ -51,6 +51,14 @@ async function processDocument({ name, email, docName, link }) {
   // 4. Share folder and file with client
   await shareWithEmail(drive, folderId, email);
   await shareWithEmail(drive, fileId, email);
+
+  // 5. Update GHL contact field with the Drive file link
+  const driveUrl = `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
+  if (contactId) {
+    await updateContactField(contactId, 'signed_contract_doc', driveUrl);
+  } else {
+    console.warn('[GHL] No contact ID received — skipping custom field update');
+  }
 
   console.log(`[Done] Document processed successfully for ${name} <${email}>`);
 }
