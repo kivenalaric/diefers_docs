@@ -1,0 +1,16 @@
+{
+  "name": "diefer-doc-sending",
+  "version": "1.0.0",
+  "description": "Webhook server: GHL signed doc → Google Drive upload",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "googleapis": "^140.0.1",
+    "puppeteer": "^24.42.0"
+  }
+}
