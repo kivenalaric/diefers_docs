@@ -76,6 +76,38 @@ async function downloadSignedPdf(viewerUrl) {
   }
 }
 
+async function getAssignedUserEmail(contactId) {
+  const contactRes = await axios.get(
+    `https://services.leadconnectorhq.com/contacts/${contactId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.GHL_API_KEY}`,
+        Version: '2021-07-28',
+      },
+    }
+  );
+
+  const assignedUserId = contactRes.data.contact?.assignedTo;
+  if (!assignedUserId) {
+    console.log(`[GHL] No assigned user found for contact ${contactId}`);
+    return null;
+  }
+
+  const userRes = await axios.get(
+    `https://services.leadconnectorhq.com/users/${assignedUserId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.GHL_API_KEY}`,
+        Version: '2021-07-28',
+      },
+    }
+  );
+
+  const email = userRes.data.email;
+  console.log(`[GHL] Assigned attorney email: ${email}`);
+  return email;
+}
+
 async function updateContactField(contactId, fieldKey, value) {
   await axios.put(
     `https://services.leadconnectorhq.com/contacts/${contactId}`,
@@ -91,4 +123,4 @@ async function updateContactField(contactId, fieldKey, value) {
   console.log(`[GHL] Updated contact ${contactId} field "${fieldKey}" = ${value}`);
 }
 
-module.exports = { downloadSignedPdf, updateContactField };
+module.exports = { downloadSignedPdf, updateContactField, getAssignedUserEmail };

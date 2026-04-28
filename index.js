@@ -1,16 +1,18 @@
 require('dotenv').config();
 
 const express = require('express');
-const { downloadSignedPdf, updateContactField } = require('./ghl');
+const { downloadSignedPdf, updateContactField, getAssignedUserEmail } = require('./ghl');
 const { getOrCreateClientFolder, uploadPdf, shareWithEmail } = require('./drive');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.get('/webhook', async (req, res) => {
-  const { name, email, link } = req.query;
+  const { email, link } = req.query;
   const contactId = req.query['id'];
   const docName = req.query['doc name'] || req.query['doc_name'] || req.query['contract'] || '';
+  const name = req.query['name'] || (email ? email.split('@')[0] : '');
+  const attorneyEmail = req.query['attorney_email'] || '';
 
   console.log(`\n[Webhook] Received — name: "${name}", email: "${email}", doc: "${docName}"`);
   console.log(`[Webhook] viewer link: ${link || '(none)'}`);
@@ -18,8 +20,8 @@ app.get('/webhook', async (req, res) => {
   // Respond immediately so GHL doesn't time out
   res.status(200).json({ received: true });
 
-  if (!name || !email) {
-    console.error('[Webhook] Missing required params (name, email). Skipping.');
+  if (!email) {
+    console.error('[Webhook] Missing required param (email). Skipping.');
     return;
   }
 
@@ -28,12 +30,12 @@ app.get('/webhook', async (req, res) => {
     return;
   }
 
-  processDocument({ name, email, docName, link, contactId }).catch((err) => {
+  processDocument({ name, email, docName, link, contactId, attorneyEmail }).catch((err) => {
     console.error('[Webhook] Unhandled error in processDocument:', err.message || err);
   });
 });
 
-async function processDocument({ name, email, docName, link, contactId }) {
+async function processDocument({ name, email, docName, link, contactId, attorneyEmail }) {
   // 1. Extract PDF from the InfoSubmit viewer via headless browser
   const pdfBuffer = await downloadSignedPdf(link);
   console.log(`[GHL] PDF captured — ${pdfBuffer.length} bytes`);
@@ -52,7 +54,22 @@ async function processDocument({ name, email, docName, link, contactId }) {
   await shareWithEmail(drive, folderId, email);
   await shareWithEmail(drive, fileId, email);
 
-  // 5. Update GHL contact field with the Drive file link
+  // 5. Share folder with assigned attorney
+  let resolvedAttorneyEmail = attorneyEmail;
+  if (!resolvedAttorneyEmail && contactId) {
+    try {
+      resolvedAttorneyEmail = await getAssignedUserEmail(contactId);
+    } catch (err) {
+      console.warn(`[GHL] Could not look up attorney via API: ${err.message}`);
+    }
+  }
+  if (resolvedAttorneyEmail) {
+    await shareWithEmail(drive, folderId, resolvedAttorneyEmail);
+  } else {
+    console.warn('[GHL] No attorney email found — skipping attorney folder share');
+  }
+
+  // 6. Update GHL contact field with the Drive folder link
   const driveUrl = `https://drive.google.com/drive/folders/${folderId}`;
   if (contactId) {
     await updateContactField(contactId, 'signed_contract_doc', driveUrl);
