@@ -53,7 +53,7 @@ async function processDocument({ name, email, docName, link, contactId }) {
   await shareWithEmail(drive, fileId, email);
 
   // 5. Update GHL contact field with the Drive file link
-  const driveUrl = `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
+  const driveUrl = `https://drive.google.com/drive/folders/${folderId}`;
   if (contactId) {
     await updateContactField(contactId, 'signed_contract_doc', driveUrl);
   } else {
